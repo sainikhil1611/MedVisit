@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Stethoscope, User, Activity } from "lucide-react";
+import { Stethoscope, User, Activity, LayoutDashboard } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,7 +8,13 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const isDoctor = location.pathname.startsWith("/doctor");
+  const path = location.pathname;
+
+  const navItems = [
+    { to: "/doctor", label: "Doctor", icon: Stethoscope },
+    { to: "/patient", label: "Patient", icon: User },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -24,28 +30,23 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
 
           <nav className="flex items-center gap-1 rounded-full bg-muted p-1">
-            <Link
-              to="/doctor"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                isDoctor
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Stethoscope className="h-4 w-4" />
-              Doctor
-            </Link>
-            <Link
-              to="/patient"
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                !isDoctor
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <User className="h-4 w-4" />
-              Patient
-            </Link>
+            {navItems.map(item => {
+              const isActive = path.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
       </header>

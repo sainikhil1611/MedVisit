@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import DoctorView from "@/pages/DoctorView";
 import PatientView from "@/pages/PatientView";
+import Dashboard from "@/pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/doctor" replace />} />
             <Route path="/doctor" element={<DoctorView />} />
             <Route path="/patient" element={<PatientView />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
