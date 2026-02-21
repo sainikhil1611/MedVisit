@@ -1,61 +1,121 @@
-import { useState, useCallback } from "react";
-import { Upload, Video, CheckCircle2, Loader2, FileVideo } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Upload, Video, CheckCircle2, Loader2, FileVideo, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uploadVideo, getUploadStatus, VIDEO_ID_KEY } from "@/lib/api";
 
 interface VideoUploadProps {
-  onAnalysisComplete: () => void;
+  onAnalysisComplete: (videoId: string) => void;
 }
 
-type UploadStatus = "idle" | "uploading" | "analyzing" | "complete";
+type UploadStatus = "idle" | "uploading" | "analyzing" | "complete" | "error";
+
+const POLL_INTERVAL_MS = 3000;
 
 const VideoUpload = ({ onAnalysisComplete }: VideoUploadProps) => {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [fileName, setFileName] = useState("");
   const [progress, setProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const simulateUpload = useCallback((file: File) => {
-    setFileName(file.name);
-    setStatus("uploading");
-    setProgress(0);
-
-    const uploadInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(uploadInterval);
-          setStatus("analyzing");
-          simulateAnalysis();
-          return 100;
-        }
-        return prev + Math.random() * 15 + 5;
-      });
-    }, 200);
-  }, []);
-
-  const simulateAnalysis = () => {
-    let step = 0;
-    const steps = ["Extracting audio...", "Transcribing conversation...", "Identifying topics...", "Generating EMR...", "Creating medication plan..."];
-    const analysisInterval = setInterval(() => {
-      step++;
-      if (step >= steps.length) {
-        clearInterval(analysisInterval);
-        setStatus("complete");
-        setTimeout(() => onAnalysisComplete(), 800);
-      }
-    }, 1200);
+  const stopProgressAnimation = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    const file = e.dataTransfer.files[0];
-    if (file) simulateUpload(file);
-  }, [simulateUpload]);
+  const startProgressAnimation = () => {
+    progressIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 90) return prev; // Cap at 90% until server confirms
+        return prev + Math.random() * 8 + 3;
+      });
+    }, 300);
+  };
+
+  const pollStatus = useCallback(
+    async (taskId: string, videoId: string) => {
+      try {
+        const result = await getUploadStatus(taskId);
+        if (result.status === "ready") {
+          const resolvedVideoId = result.video_id || videoId;
+          localStorage.setItem(VIDEO_ID_KEY, resolvedVideoId);
+          setStatus("complete");
+          setTimeout(() => onAnalysisComplete(resolvedVideoId), 800);
+        } else if (result.status === "failed") {
+          stopProgressAnimation();
+          setStatus("error");
+          setErrorMsg(result.error || "Processing failed. Please try again.");
+        } else {
+          // Still indexing — poll again
+          pollTimeoutRef.current = setTimeout(() => pollStatus(taskId, videoId), POLL_INTERVAL_MS);
+        }
+      } catch {
+        stopProgressAnimation();
+        setStatus("error");
+        setErrorMsg("Could not reach the server. Is the backend running?");
+      }
+    },
+    [onAnalysisComplete]
+  );
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setFileName(file.name);
+      setStatus("uploading");
+      setProgress(0);
+      setErrorMsg("");
+      startProgressAnimation();
+
+      try {
+        const result = await uploadVideo(file, "appt-001", "patient-001", "doctor-001");
+        stopProgressAnimation();
+        setProgress(100);
+        setStatus("analyzing");
+        // Start polling for indexing completion
+        pollTimeoutRef.current = setTimeout(
+          () => pollStatus(result.task_id, result.video_id),
+          POLL_INTERVAL_MS
+        );
+      } catch (e) {
+        stopProgressAnimation();
+        setStatus("error");
+        setErrorMsg(e instanceof Error ? e.message : "Upload failed. Is the backend running?");
+      }
+    },
+    [pollStatus]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragActive(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile]
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) simulateUpload(file);
+    if (file) handleFile(file);
   };
+
+  if (status === "error") {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-destructive/40 bg-destructive/5 p-12 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+        </div>
+        <h3 className="mb-1 text-lg font-semibold text-foreground">Upload Failed</h3>
+        <p className="mb-4 text-sm text-muted-foreground">{errorMsg}</p>
+        <Button variant="outline" onClick={() => setStatus("idle")}>Try Again</Button>
+      </div>
+    );
+  }
 
   if (status === "complete") {
     return (

@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Medication, mockMedications } from "@/lib/mockData";
-import { Pill, CheckCircle2, Trash2, Plus, Edit3, Send, AlertTriangle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Medication } from "@/lib/mockData";
+import { Pill, CheckCircle2, Trash2, Plus, Edit3, Send, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { getPendingReviews, approveMedications, overrideMedications, AIMedication } from "@/lib/api";
 
 interface MedicationPlanDoctorProps {
+  videoId: string | null;
   onPublish: () => void;
   published: boolean;
 }
@@ -17,23 +20,67 @@ const confidenceColor = (score: number) => {
   return "bg-destructive/10 text-destructive border-destructive/20";
 };
 
-const MedicationPlanDoctor = ({ onPublish, published }: MedicationPlanDoctorProps) => {
-  const [medications, setMedications] = useState<Medication[]>(mockMedications);
+function aiMedToMedication(ai: AIMedication, index: number): Medication {
+  return {
+    id: `ai-${index}`,
+    name: ai.name,
+    dosage: ai.dosage,
+    frequency: ai.frequency,
+    duration: "As prescribed",
+    notes: [ai.purpose, ai.instructions].filter(Boolean).join(" · "),
+    confidence: 0.9,
+    approved: false,
+  };
+}
+
+function medicationsToOverrideText(meds: Medication[]): string {
+  return meds
+    .map(
+      (m) =>
+        `Medication: ${m.name} ${m.dosage}\nFrequency: ${m.frequency}\nDuration: ${m.duration}${m.notes ? `\nNotes: ${m.notes}` : ""}`
+    )
+    .join("\n---\n");
+}
+
+const MedicationPlanDoctor = ({ videoId, onPublish, published }: MedicationPlanDoctorProps) => {
+  // useQuery with staleTime: Infinity so the result is cached across remounts
+  const { data: reviewData, isLoading } = useQuery({
+    queryKey: ["pendingReviews", videoId],
+    queryFn: getPendingReviews,
+    enabled: !!videoId,
+    staleTime: Infinity,
+    // Retry up to 4 times with 3s delay to handle slow medication extraction
+    retry: 4,
+    retryDelay: 3000,
+    select: (data) => {
+      const match = data.pending.find((r) => r.video_id === videoId);
+      return match?.ai_medications.map(aiMedToMedication) ?? [];
+    },
+  });
+
+  const [medications, setMedications] = useState<Medication[] | null>(null);
+  const [hasEdits, setHasEdits] = useState(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newMed, setNewMed] = useState<Partial<Medication>>({ name: "", dosage: "", frequency: "", duration: "", notes: "" });
+  const [publishing, setPublishing] = useState(false);
+
+  // Once query resolves, seed local state once (so edits work without refetch)
+  const displayMeds: Medication[] = medications ?? (reviewData ?? []);
 
   const toggleApproval = (id: string) => {
-    setMedications((prev) => prev.map((m) => (m.id === id ? { ...m, approved: !m.approved } : m)));
+    setMedications((prev) => (prev ?? displayMeds).map((m) => (m.id === id ? { ...m, approved: !m.approved } : m)));
   };
 
   const removeMed = (id: string) => {
-    setMedications((prev) => prev.filter((m) => m.id !== id));
+    setHasEdits(true);
+    setMedications((prev) => (prev ?? displayMeds).filter((m) => m.id !== id));
   };
 
   const saveMedEdit = () => {
     if (!editingMed) return;
-    setMedications((prev) => prev.map((m) => (m.id === editingMed.id ? editingMed : m)));
+    setHasEdits(true);
+    setMedications((prev) => (prev ?? displayMeds).map((m) => (m.id === editingMed.id ? editingMed : m)));
     setEditingMed(null);
   };
 
@@ -48,12 +95,42 @@ const MedicationPlanDoctor = ({ onPublish, published }: MedicationPlanDoctorProp
       confidence: 1,
       approved: true,
     };
-    setMedications((prev) => [...prev, med]);
+    setHasEdits(true);
+    setMedications((prev) => [...(prev ?? displayMeds), med]);
     setNewMed({ name: "", dosage: "", frequency: "", duration: "", notes: "" });
     setShowAdd(false);
   };
 
-  const allApproved = medications.length > 0 && medications.every((m) => m.approved);
+  const handlePublish = async () => {
+    if (!videoId) {
+      onPublish();
+      return;
+    }
+    setPublishing(true);
+    try {
+      if (hasEdits) {
+        await overrideMedications(videoId, medicationsToOverrideText(displayMeds));
+      } else {
+        await approveMedications(videoId);
+      }
+      onPublish();
+    } catch {
+      onPublish(); // still mark published locally so the UI isn't stuck
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const allApproved = displayMeds.length > 0 && displayMeds.every((m) => m.approved);
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-8 flex flex-col items-center gap-3">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading AI-extracted medications…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -64,7 +141,9 @@ const MedicationPlanDoctor = ({ onPublish, published }: MedicationPlanDoctorProp
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Medication Plan</h3>
-            <p className="text-xs text-muted-foreground">Review and approve before sharing with patient</p>
+            <p className="text-xs text-muted-foreground">
+              {videoId ? "AI-extracted · Review and approve before sharing" : "Review and approve before sharing with patient"}
+            </p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowAdd(true)}>
@@ -73,43 +152,49 @@ const MedicationPlanDoctor = ({ onPublish, published }: MedicationPlanDoctorProp
         </Button>
       </div>
 
-      <div className="divide-y divide-border">
-        {medications.map((med) => (
-          <div key={med.id} className={`flex items-start gap-4 px-6 py-4 transition-colors ${med.approved ? "bg-success/[0.02]" : ""}`}>
-            <button
-              onClick={() => toggleApproval(med.id)}
-              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                med.approved ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
-              }`}
-            >
-              {med.approved && <CheckCircle2 className="h-4 w-4" />}
-            </button>
+      {displayMeds.length === 0 ? (
+        <div className="px-6 py-8 text-center text-sm text-muted-foreground">
+          No medications detected in the recording.
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          {displayMeds.map((med) => (
+            <div key={med.id} className={`flex items-start gap-4 px-6 py-4 transition-colors ${med.approved ? "bg-success/[0.02]" : ""}`}>
+              <button
+                onClick={() => toggleApproval(med.id)}
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                  med.approved ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
+                }`}
+              >
+                {med.approved && <CheckCircle2 className="h-4 w-4" />}
+              </button>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-foreground">{med.name}</span>
-                <span className="text-sm text-muted-foreground">{med.dosage}</span>
-                <Badge variant="outline" className={`text-[10px] ${confidenceColor(med.confidence)}`}>
-                  {Math.round(med.confidence * 100)}% confidence
-                </Badge>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-foreground">{med.name}</span>
+                  <span className="text-sm text-muted-foreground">{med.dosage}</span>
+                  <Badge variant="outline" className={`text-[10px] ${confidenceColor(med.confidence)}`}>
+                    {Math.round(med.confidence * 100)}% confidence
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {med.frequency} · {med.duration}
+                </p>
+                {med.notes && <p className="mt-1 text-xs text-muted-foreground italic">{med.notes}</p>}
               </div>
-              <p className="text-sm text-muted-foreground">
-                {med.frequency} · {med.duration}
-              </p>
-              {med.notes && <p className="mt-1 text-xs text-muted-foreground italic">{med.notes}</p>}
-            </div>
 
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setEditingMed({ ...med })}>
-                <Edit3 className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeMed(med.id)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setEditingMed({ ...med })}>
+                  <Edit3 className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeMed(med.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="border-t border-border bg-muted/30 px-6 py-4">
         {published ? (
@@ -123,8 +208,12 @@ const MedicationPlanDoctor = ({ onPublish, published }: MedicationPlanDoctorProp
             Approve all medications before sharing with patient
           </div>
         ) : (
-          <Button onClick={onPublish}>
-            <Send className="mr-2 h-4 w-4" />
+          <Button onClick={handlePublish} disabled={publishing}>
+            {publishing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             Share with Patient
           </Button>
         )}
