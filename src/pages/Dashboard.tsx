@@ -4,16 +4,12 @@ import {
   ClipboardList, FlaskConical, TrendingDown, TrendingUp, Minus,
   ChevronRight
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  ChartContainer, ChartTooltip, ChartTooltipContent
-} from "@/components/ui/chart";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import {
   patientProfile, vitalSigns, icd10Codes, allergies, labTests,
-  medications, planOfCare, vitalTrends
+  medications, planOfCare
 } from "@/lib/dashboardData";
 
 const vitalIcons: Record<string, React.ReactNode> = {
@@ -54,30 +50,6 @@ const labStatusBadge = {
   completed: "bg-success/10 text-success border-success/20",
   overdue: "bg-destructive/10 text-destructive border-destructive/20",
 };
-
-const bpChartConfig = {
-  systolic: { label: "Systolic", color: "hsl(0 72% 51%)" },
-  diastolic: { label: "Diastolic", color: "hsl(205 85% 50%)" },
-};
-
-const hrChartConfig = {
-  heartRate: { label: "Heart Rate", color: "hsl(152 55% 42%)" },
-};
-
-const diagnosisData = icd10Codes.filter(c => c.status !== "resolved").map((c, i) => ({
-  name: c.description.split(" ").slice(0, 2).join(" "),
-  value: 1,
-  code: c.code,
-  full: c.description,
-}));
-
-const pieColors = [
-  "hsl(174 42% 35%)",
-  "hsl(205 85% 50%)",
-  "hsl(38 92% 50%)",
-  "hsl(152 55% 42%)",
-  "hsl(0 72% 51%)",
-];
 
 const Dashboard = () => {
   return (
@@ -147,50 +119,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Middle Section: ICD-10, Allergies */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* BP Trend */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Blood Pressure Trend</CardTitle>
-            <CardDescription>6-month systolic/diastolic tracking</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={bpChartConfig} className="h-[220px] w-full">
-              <LineChart data={vitalTrends} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="date" className="text-xs" tick={{ fill: "hsl(210 10% 46%)" }} />
-                <YAxis domain={[70, 160]} tick={{ fill: "hsl(210 10% 46%)" }} className="text-xs" />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line type="monotone" dataKey="systolic" stroke="var(--color-systolic)" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="diastolic" stroke="var(--color-diastolic)" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Heart Rate Trend */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Heart Rate Trend</CardTitle>
-            <CardDescription>6-month resting heart rate</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={hrChartConfig} className="h-[220px] w-full">
-              <BarChart data={vitalTrends} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="date" tick={{ fill: "hsl(210 10% 46%)" }} className="text-xs" />
-                <YAxis domain={[60, 100]} tick={{ fill: "hsl(210 10% 46%)" }} className="text-xs" />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="heartRate" fill="var(--color-heartRate)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Middle Section: ICD-10, Allergies, Diagnosis Pie */}
-      <div className="grid gap-4 lg:grid-cols-3">
         {/* ICD-10 Codes */}
         <Card>
           <CardHeader className="pb-3">
@@ -239,46 +169,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Active Diagnoses Pie */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ClipboardList className="h-4 w-4 text-primary" />
-              Active Diagnoses
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={diagnosisData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {diagnosisData.map((_, index) => (
-                      <Cell key={index} fill={pieColors[index % pieColors.length]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-          <div className="px-6 pb-4">
-            <div className="space-y-1.5">
-              {diagnosisData.map((d, i) => (
-                <div key={d.code} className="flex items-center gap-2 text-xs">
-                  <div className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: pieColors[i] }} />
-                  <span className="text-muted-foreground">{d.full}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
       </div>
 
       {/* Bottom Section: Medications, Labs, Plan of Care */}
