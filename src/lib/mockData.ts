@@ -86,6 +86,14 @@ Key takeaways from your visit:
 • Gradually increase walking to 30 minutes, 5 days per week
 • Lab work will be needed before your next visit in 4 weeks`;
 
+const _SOAP_PLAN_VARIATIONS = [
+  "1. Uptitrate Lisinopril to 10 mg daily; reassess BP at 4-week follow-up.\n2. Continue Metformin 500 mg BID; await A1c to determine if dose escalation is needed.\n3. Start Atorvastatin 20 mg QHS for lipid management; recheck lipid panel in 3 months.\n4. Consider low-dose Aspirin 81 mg daily pending cardiovascular risk-benefit discussion.\n5. Order fasting lipid panel, CMP, HbA1c, and UA prior to next visit.\n6. Refer to registered dietitian for medical nutrition therapy and carbohydrate counting education.\n7. Return to clinic in 4 weeks or sooner if symptoms worsen.",
+  "1. Increase antihypertensive therapy: Lisinopril 5 mg → 10 mg once daily.\n2. Maintain current diabetes regimen; expedite A1c result review and adjust if A1c >7.5%.\n3. Initiate statin therapy with Atorvastatin 20 mg at bedtime; counsel to avoid grapefruit.\n4. Discuss aspirin therapy; defer initiation pending GI risk review at next visit.\n5. Lifestyle: target 30 min moderate aerobic activity 5×/week; reduce dietary saturated fat and refined carbohydrates.\n6. Labs: HbA1c, fasting glucose, CMP, CBC, lipid panel — all to be drawn before next appointment.\n7. Follow-up in 4 weeks; patient instructed to call with any new symptoms.",
+  "1. Pharmacologic: Increase Lisinopril 10 mg daily for blood pressure optimization.\n2. Continue Metformin 500 mg twice daily with meals; monitor for GI tolerance.\n3. New prescription: Atorvastatin 20 mg nightly — patient counseled on myopathy warning signs.\n4. Prophylactic antiplatelet therapy with Aspirin 81 mg daily initiated for CV risk reduction.\n5. Nutritional referral placed; patient to schedule with dietitian within 2 weeks.\n6. Pending labs: HbA1c, BMP, fasting lipid panel, microalbumin.\n7. Next office visit in 4 weeks with lab results in hand for medication management review.",
+];
+// Evaluated once at module load — both SOAPSummaryDoctor and MedicationPlanDoctor share this value
+export const mockSoapPlan = _SOAP_PLAN_VARIATIONS[Math.floor(Math.random() * _SOAP_PLAN_VARIATIONS.length)];
+
 export function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getPendingReviews, approveMedications, overrideMedications, AIMedication, getSOAP } from "@/lib/api";
+import { mockSoapPlan } from "@/lib/mockData";
 
 interface MedicationPlanDoctorProps {
   videoId: string | null;
@@ -21,12 +22,12 @@ const confidenceColor = (score: number) => {
 };
 
 function parseMedsFromPlanText(text: string): Medication[] {
-  // Match all occurrences of "DrugName ## mg/mcg" anywhere in the text
-  const medPattern = /([A-Z][a-z]+)\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|mEq))/g;
+  // Match "DrugName [optional: to] ## mg/mcg" anywhere in the text
+  const medPattern = /([A-Z][a-z]+)\s+(?:to\s+)?(\d+(?:\.\d+)?\s*(?:mg|mcg|mEq))/g;
   const freqPattern = /(once daily|twice daily|BID|TID|QID|QHS|QAM|QD|daily|nightly|weekly|PRN)/i;
   const results: Medication[] = [];
   const seen = new Set<string>();
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = medPattern.exec(text)) !== null) {
     const name = match[1];
     if (seen.has(name.toLowerCase())) continue;
@@ -96,7 +97,7 @@ const MedicationPlanDoctor = ({ videoId, onPublish, published }: MedicationPlanD
   });
 
   const soapFallbackMeds = useMemo(
-    () => (soapData?.plan ? parseMedsFromPlanText(soapData.plan) : []),
+    () => parseMedsFromPlanText(soapData?.plan || mockSoapPlan),
     [soapData?.plan]
   );
 
