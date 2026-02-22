@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import upload, summary, search, chapters, gist, review, tts, soap
+from routers import upload, summary, search, chapters, gist, review, tts, soap, document
 
 app = FastAPI(title="Healthcare Conversation AI", version="1.0.0")
 
@@ -20,6 +20,7 @@ app.include_router(gist.router, prefix="/api")
 app.include_router(review.router, prefix="/api")
 app.include_router(tts.router, prefix="/api")
 app.include_router(soap.router, prefix="/api")
+app.include_router(document.router, prefix="/api")
 
 
 @app.get("/api/health")

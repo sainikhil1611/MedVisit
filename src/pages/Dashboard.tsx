@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Heart, Activity, Wind, Thermometer, Scale, Droplets,
   User, Calendar, Shield, AlertTriangle, FileText, Pill,
@@ -12,9 +13,17 @@ import {
 } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
-  patientProfile, vitalSigns, icd10Codes, allergies, labTests,
-  medications, planOfCare, vitalTrends
+  patientProfile as defaultPatientProfile,
+  vitalSigns as defaultVitalSigns,
+  icd10Codes as defaultICD10Codes,
+  allergies as defaultAllergies,
+  labTests as defaultLabTests,
+  medications as defaultMedications,
+  planOfCare as defaultPlanOfCare,
+  vitalTrends
 } from "@/lib/dashboardData";
+import { DocumentUpload } from "@/components/DocumentUpload";
+import type { DashboardData } from "@/lib/api";
 
 const vitalIcons: Record<string, React.ReactNode> = {
   heart: <Heart className="h-5 w-5" />,
@@ -64,13 +73,6 @@ const hrChartConfig = {
   heartRate: { label: "Heart Rate", color: "hsl(152 55% 42%)" },
 };
 
-const diagnosisData = icd10Codes.filter(c => c.status !== "resolved").map((c, i) => ({
-  name: c.description.split(" ").slice(0, 2).join(" "),
-  value: 1,
-  code: c.code,
-  full: c.description,
-}));
-
 const pieColors = [
   "hsl(174 42% 35%)",
   "hsl(205 85% 50%)",
@@ -80,6 +82,34 @@ const pieColors = [
 ];
 
 const Dashboard = () => {
+  // State for dashboard data
+  const [patientProfile, setPatientProfile] = useState(defaultPatientProfile);
+  const [vitalSigns, setVitalSigns] = useState(defaultVitalSigns);
+  const [icd10Codes, setIcd10Codes] = useState(defaultICD10Codes);
+  const [allergies, setAllergies] = useState(defaultAllergies);
+  const [labTests, setLabTests] = useState(defaultLabTests);
+  const [medications, setMedications] = useState(defaultMedications);
+  const [planOfCare, setPlanOfCare] = useState(defaultPlanOfCare);
+
+  // Calculate diagnosis data based on current ICD-10 codes
+  const diagnosisData = icd10Codes.filter(c => c.status !== "resolved").map((c, i) => ({
+    name: c.description.split(" ").slice(0, 2).join(" "),
+    value: 1,
+    code: c.code,
+    full: c.description,
+  }));
+
+  const handleDocumentUpload = (data: DashboardData) => {
+    // Update all dashboard data from uploaded document
+    if (data.patientProfile) setPatientProfile(data.patientProfile);
+    if (data.vitalSigns) setVitalSigns(data.vitalSigns);
+    if (data.icd10Codes) setIcd10Codes(data.icd10Codes);
+    if (data.allergies) setAllergies(data.allergies);
+    if (data.labTests) setLabTests(data.labTests);
+    if (data.medications) setMedications(data.medications);
+    if (data.planOfCare) setPlanOfCare(data.planOfCare);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -89,6 +119,9 @@ const Dashboard = () => {
         </h1>
         <p className="text-sm text-muted-foreground">Comprehensive overview of patient health metrics and clinical data</p>
       </div>
+
+      {/* Document Upload Section */}
+      <DocumentUpload onUploadSuccess={handleDocumentUpload} />
 
       {/* Patient Profile Banner */}
       <Card className="overflow-hidden border-primary/20">

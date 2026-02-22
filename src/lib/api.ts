@@ -198,3 +198,68 @@ export async function getSOAP(videoId: string): Promise<SOAPResult> {
   if (!res.ok) throw new Error(`SOAP fetch failed: ${await res.text()}`);
   return res.json();
 }
+
+export interface DashboardData {
+  patientProfile: {
+    name: string;
+    dob: string;
+    age: number;
+    sex: string;
+    mrn: string;
+    primaryPhysician: string;
+    insuranceProvider: string;
+    lastVisit: string;
+  };
+  vitalSigns: Array<{
+    label: string;
+    value: string;
+    unit: string;
+    status: "normal" | "warning" | "critical";
+    icon: string;
+  }>;
+  icd10Codes: Array<{
+    code: string;
+    description: string;
+    status: "active" | "resolved" | "chronic";
+  }>;
+  allergies: Array<{
+    name: string;
+    severity: "mild" | "moderate" | "severe";
+    reaction: string;
+  }>;
+  labTests: Array<{
+    name: string;
+    status: "pending" | "completed" | "overdue";
+    date: string;
+    result?: string;
+    normalRange?: string;
+  }>;
+  medications: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    status: string;
+  }>;
+  planOfCare: string[];
+}
+
+export interface DocumentUploadResult {
+  status: string;
+  message: string;
+  data: DashboardData;
+}
+
+export async function uploadDocument(file: File): Promise<DocumentUploadResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${BASE_URL}/document/upload`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error(`Document upload failed: ${await res.text()}`);
+  return res.json();
+}
+
+export async function getLatestDocument(): Promise<DashboardData> {
+  const res = await fetch(`${BASE_URL}/document/latest`);
+  if (!res.ok) throw new Error(`Failed to fetch document: ${await res.text()}`);
+  return res.json();
+}
