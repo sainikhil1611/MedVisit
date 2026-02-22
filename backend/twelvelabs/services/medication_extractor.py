@@ -11,9 +11,10 @@ For each medication, provide:
 4. purpose: Reason for prescribing, else null
 5. instructions: Any warnings or special instructions given
 6. video_start_seconds: Time in the video (in seconds) when first mentioned
+7. confidence: A float between 0.0 and 1.0 — how confident you are this medication was explicitly prescribed or recommended (not just mentioned in passing). Use 0.9+ for clearly prescribed medications, 0.7-0.89 for likely prescribed, below 0.7 for uncertain.
 
 Return ONLY a valid JSON array. If no medications were discussed, return [].
-Example: [{"name":"Lisinopril","dosage":"10mg","frequency":"once daily","purpose":"blood pressure","instructions":"take in the morning","video_start_seconds":312}]"""
+Example: [{"name":"Lisinopril","dosage":"10mg","frequency":"once daily","purpose":"blood pressure","instructions":"take in the morning","video_start_seconds":312,"confidence":0.95}]"""
 
 # In-memory store for medication suggestions keyed by video_id
 _medication_store: dict[str, list] = {}

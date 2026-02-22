@@ -45,7 +45,7 @@ function aiMedsToPatientMedications(meds: AIMedication[]): Medication[] {
     frequency: m.frequency,
     duration: "As prescribed",
     notes: [m.purpose, m.instructions].filter(Boolean).join(" · "),
-    confidence: 0.9,
+    confidence: m.confidence ?? 0.85,
     approved: true,
   }));
 }

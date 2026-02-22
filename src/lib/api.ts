@@ -7,6 +7,15 @@ export interface AIMedication {
   purpose: string;
   instructions: string;
   video_start_seconds: number;
+  confidence: number;
+}
+
+export interface SOAPResult {
+  video_id: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
 }
 
 export interface UploadResult {
@@ -182,4 +191,10 @@ export async function getSpeech(text: string, language: string): Promise<Blob> {
   });
   if (!res.ok) throw new Error(`TTS failed: ${await res.text()}`);
   return res.blob();
+}
+
+export async function getSOAP(videoId: string): Promise<SOAPResult> {
+  const res = await fetch(`${BASE_URL}/soap/${videoId}`);
+  if (!res.ok) throw new Error(`SOAP fetch failed: ${await res.text()}`);
+  return res.json();
 }

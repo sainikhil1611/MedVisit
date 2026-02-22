@@ -10,7 +10,7 @@ import asyncio
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend", "twelvelabs"))
 
 from services.twelvelabs_client import TwelveLabsClient
 
@@ -26,7 +26,7 @@ async def main():
     print(f"TWELVELABS_INDEX_ID={index_id}")
 
     # Auto-write to .env if it exists or create it
-    env_path = os.path.join(os.path.dirname(__file__), "..", "backend", ".env")
+    env_path = os.path.join(os.path.dirname(__file__), "..", "backend", "twelvelabs", ".env")
     lines = []
     if os.path.exists(env_path):
         with open(env_path) as f:

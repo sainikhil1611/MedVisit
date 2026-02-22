@@ -28,7 +28,7 @@ function aiMedToMedication(ai: AIMedication, index: number): Medication {
     frequency: ai.frequency,
     duration: "As prescribed",
     notes: [ai.purpose, ai.instructions].filter(Boolean).join(" · "),
-    confidence: 0.9,
+    confidence: ai.confidence ?? 0.85,
     approved: false,
   };
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import VideoUpload from "@/components/VideoUpload";
-import EMRDocument from "@/components/EMRDocument";
+import SOAPSummaryDoctor from "@/components/SOAPSummaryDoctor";
 import MedicationPlanDoctor from "@/components/MedicationPlanDoctor";
 import { VIDEO_ID_KEY } from "@/lib/api";
 
@@ -8,7 +8,6 @@ type DoctorStep = "upload" | "review";
 
 const DoctorView = () => {
   const [step, setStep] = useState<DoctorStep>("upload");
-  const [emrApproved, setEmrApproved] = useState(false);
   const [medPublished, setMedPublished] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(
     () => localStorage.getItem(VIDEO_ID_KEY)
@@ -26,7 +25,7 @@ const DoctorView = () => {
           Doctor Dashboard
         </h1>
         <p className="text-sm text-muted-foreground">
-          Upload a consultation recording to generate EMR and medication plan
+          Upload a consultation recording to generate a SOAP note and medication plan
         </p>
       </div>
 
@@ -48,14 +47,12 @@ const DoctorView = () => {
 
       {step === "review" && (
         <div className="space-y-6">
-          <EMRDocument approved={emrApproved} onApprove={() => setEmrApproved(true)} />
-          {emrApproved && (
-            <MedicationPlanDoctor
-              videoId={videoId}
-              published={medPublished}
-              onPublish={() => setMedPublished(true)}
-            />
-          )}
+          <SOAPSummaryDoctor videoId={videoId} />
+          <MedicationPlanDoctor
+            videoId={videoId}
+            published={medPublished}
+            onPublish={() => setMedPublished(true)}
+          />
         </div>
       )}
     </div>
