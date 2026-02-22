@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getGist, getSummary, getChapters, getVideoInfo, searchVideo, VIDEO_ID_KEY, AIMedication, SearchClip } from "@/lib/api";
+import { TTSPlayer } from "@/components/TTSPlayer";
 
 const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="h-5 w-5" />,
@@ -240,6 +241,7 @@ const PatientView = () => {
                 </p>
               ))}
             </div>
+            <TTSPlayer text={doctorSummary} />
           </div>
         )
       )}

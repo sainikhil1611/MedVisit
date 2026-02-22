@@ -221,21 +221,27 @@ class TwelveLabsClient:
         search_options: list | None = None,
         page_limit: int = 5,
     ) -> list:
-        payload: dict = {
-            "index_id": index_id,
-            "query_text": query_text,
-            "search_options": search_options or ["audio"],
-            "group_by": "clip",
-            "threshold": "medium",
-            "page_limit": page_limit,
-        }
+        opts = search_options or ["audio"]
+        # TwelveLabs v1.3 search requires multipart/form-data; use files= to force it
+        parts: list[tuple[str, tuple]] = [
+            ("index_id", (None, index_id)),
+            ("query_text", (None, query_text)),
+            ("group_by", (None, "clip")),
+            ("threshold", (None, "medium")),
+            ("page_limit", (None, str(page_limit))),
+        ]
+        for opt in opts:
+            parts.append(("search_options", (None, opt)))
         if filter_metadata:
-            payload["filter"] = {"user_metadata": filter_metadata}
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{self.base_url}/search",
-                headers={**self.headers, "Content-Type": "application/json"},
-                json=payload,
-            )
-            resp.raise_for_status()
-            return resp.json().get("data", [])
+            parts.append(("filter", (None, json.dumps({"user_metadata": filter_metadata}))))
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    f"{self.base_url}/search",
+                    headers=self.headers,
+                    files=parts,
+                )
+                resp.raise_for_status()
+                return resp.json().get("data", [])
+        except Exception as e:
+            raise RuntimeError(_tl_error(e)) from e

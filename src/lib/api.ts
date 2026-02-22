@@ -173,3 +173,13 @@ export async function searchVideo(query: string, videoId?: string | null): Promi
 }
 
 export const VIDEO_ID_KEY = "medvisit_video_id";
+
+export async function getSpeech(text: string, language: string): Promise<Blob> {
+  const res = await fetch(`${BASE_URL}/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language }),
+  });
+  if (!res.ok) throw new Error(`TTS failed: ${await res.text()}`);
+  return res.blob();
+}
