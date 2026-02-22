@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Medication } from "@/lib/mockData";
 import { Pill, CheckCircle2, Trash2, Plus, Edit3, Send, AlertTriangle, Loader2 } from "lucide-react";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { getPendingReviews, approveMedications, overrideMedications, AIMedication } from "@/lib/api";
+import { getPendingReviews, approveMedications, overrideMedications, AIMedication, getSOAP } from "@/lib/api";
 
 interface MedicationPlanDoctorProps {
   videoId: string | null;
@@ -19,6 +19,34 @@ const confidenceColor = (score: number) => {
   if (score >= 0.7) return "bg-warning/10 text-warning border-warning/20";
   return "bg-destructive/10 text-destructive border-destructive/20";
 };
+
+function parseMedsFromPlanText(text: string): Medication[] {
+  // Match all occurrences of "DrugName ## mg/mcg" anywhere in the text
+  const medPattern = /([A-Z][a-z]+)\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|mEq))/g;
+  const freqPattern = /(once daily|twice daily|BID|TID|QID|QHS|QAM|QD|daily|nightly|weekly|PRN)/i;
+  const results: Medication[] = [];
+  const seen = new Set<string>();
+  let match;
+  while ((match = medPattern.exec(text)) !== null) {
+    const name = match[1];
+    if (seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    // Look for a frequency keyword in the ~100 chars following the match
+    const window = text.slice(match.index, match.index + 100);
+    const freqMatch = window.match(freqPattern);
+    results.push({
+      id: `plan-${results.length}`,
+      name,
+      dosage: match[2].trim(),
+      frequency: freqMatch?.[1] || 'As directed',
+      duration: 'As prescribed',
+      notes: window.split(/[.;]/)[0].trim(),
+      confidence: 0.8,
+      approved: false,
+    });
+  }
+  return results;
+}
 
 function aiMedToMedication(ai: AIMedication, index: number): Medication {
   return {
@@ -58,6 +86,20 @@ const MedicationPlanDoctor = ({ videoId, onPublish, published }: MedicationPlanD
     },
   });
 
+  // Same queryKey as SOAPSummaryDoctor — TanStack Query returns the cached result, no extra request
+  const { data: soapData } = useQuery({
+    queryKey: ["soap", videoId],
+    queryFn: () => getSOAP(videoId!),
+    enabled: !!videoId,
+    staleTime: Infinity,
+    retry: 2,
+  });
+
+  const soapFallbackMeds = useMemo(
+    () => (soapData?.plan ? parseMedsFromPlanText(soapData.plan) : []),
+    [soapData?.plan]
+  );
+
   const [medications, setMedications] = useState<Medication[] | null>(null);
   const [hasEdits, setHasEdits] = useState(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
@@ -65,8 +107,8 @@ const MedicationPlanDoctor = ({ videoId, onPublish, published }: MedicationPlanD
   const [newMed, setNewMed] = useState<Partial<Medication>>({ name: "", dosage: "", frequency: "", duration: "", notes: "" });
   const [publishing, setPublishing] = useState(false);
 
-  // Once query resolves, seed local state once (so edits work without refetch)
-  const displayMeds: Medication[] = medications ?? (reviewData ?? []);
+  // Use backend medications if available, otherwise fall back to medications parsed from the SOAP plan
+  const displayMeds: Medication[] = medications ?? (reviewData?.length ? reviewData : soapFallbackMeds);
 
   const toggleApproval = (id: string) => {
     setMedications((prev) => (prev ?? displayMeds).map((m) => (m.id === id ? { ...m, approved: !m.approved } : m)));

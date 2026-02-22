@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mockTopics, mockTimestamps, mockMedications, mockDoctorSummary, formatTime } from "@/lib/mockData";
 import type { Topic, Timestamp, Medication } from "@/lib/mockData";
@@ -6,7 +6,7 @@ import { Heart, Pill, Apple, CalendarDays, Activity, Stethoscope, Clock, PlayCir
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { getGist, getSummary, getChapters, getVideoInfo, searchVideo, VIDEO_ID_KEY, AIMedication, SearchClip } from "@/lib/api";
+import { getGist, getSummary, getChapters, getVideoInfo, searchVideo, getSOAP, VIDEO_ID_KEY, AIMedication, SearchClip } from "@/lib/api";
 import { TTSPlayer } from "@/components/TTSPlayer";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -48,6 +48,32 @@ function aiMedsToPatientMedications(meds: AIMedication[]): Medication[] {
     confidence: m.confidence ?? 0.85,
     approved: true,
   }));
+}
+
+function parseMedsFromPlanText(text: string): Medication[] {
+  const medPattern = /([A-Z][a-z]+)\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|mEq))/g;
+  const freqPattern = /(once daily|twice daily|BID|TID|QID|QHS|QAM|QD|daily|nightly|weekly|PRN)/i;
+  const results: Medication[] = [];
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = medPattern.exec(text)) !== null) {
+    const name = match[1];
+    if (seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const window = text.slice(match.index, match.index + 100);
+    const freqMatch = window.match(freqPattern);
+    results.push({
+      id: `plan-${results.length}`,
+      name,
+      dosage: match[2].trim(),
+      frequency: freqMatch?.[1] || 'As directed',
+      duration: 'As prescribed',
+      notes: window.split(/[.;]/)[0].trim(),
+      confidence: 0.8,
+      approved: true,
+    });
+  }
+  return results;
 }
 
 const STALE = Infinity;
@@ -95,6 +121,15 @@ const PatientView = () => {
     staleTime: STALE,
   });
 
+  // Same queryKey as SOAPSummaryDoctor / MedicationPlanDoctor — uses cached result, no extra request
+  const { data: soapData } = useQuery({
+    queryKey: ["soap", videoId],
+    queryFn: () => getSOAP(videoId!),
+    enabled: !!videoId,
+    staleTime: STALE,
+    retry: 2,
+  });
+
   // Derive display data, falling back to mock when API data isn't available yet
   const topics: Topic[] =
     gistData?.topics?.length ? topicsFromStrings(gistData.topics) : mockTopics;
@@ -105,9 +140,16 @@ const PatientView = () => {
   const doctorSummary: string =
     summaryData?.summary || mockDoctorSummary;
 
+  const soapPlanMeds = useMemo(
+    () => (soapData?.plan ? parseMedsFromPlanText(soapData.plan) : null),
+    [soapData?.plan]
+  );
+
   const medications: Medication[] =
     summaryData?.medication_plan?.medications?.length
       ? aiMedsToPatientMedications(summaryData.medication_plan.medications)
+      : soapPlanMeds?.length
+      ? soapPlanMeds
       : mockMedications;
 
   // Set stream URL on the video element when it becomes available
