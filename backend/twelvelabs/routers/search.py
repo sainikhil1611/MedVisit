@@ -30,7 +30,7 @@ async def search_recording(req: SearchRequest):
             index_id=TWELVELABS_INDEX_ID,
             query_text=req.query,
             filter_metadata=filter_metadata or None,
-            search_options=["audio"],
+            search_options=["visual", "conversation"],
             page_limit=req.page_limit,
         )
     except Exception as e:

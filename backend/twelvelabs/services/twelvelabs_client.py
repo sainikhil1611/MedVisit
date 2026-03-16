@@ -232,6 +232,7 @@ class TwelveLabsClient:
         ]
         for opt in opts:
             parts.append(("search_options", (None, opt)))
+        parts.append(("return_transcription", (None, "true")))
         if filter_metadata:
             parts.append(("filter", (None, json.dumps({"user_metadata": filter_metadata}))))
         try:

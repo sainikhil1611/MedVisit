@@ -7,11 +7,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Frontend dependencies and build output
 node_modules
-__pycache__
 dist
 dist-ssr
 *.local
+package-lock.json
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
 
 # Editor directories and files
 .vscode/*
@@ -24,4 +33,6 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment / secrets
 .env
+.env.*
