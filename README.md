@@ -1,8 +1,4 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
+# Project Overview
 
 MedVisit is a healthcare consultation tool built for a hackathon. It records doctor-patient consultations (video), uses [TwelveLabs](https://twelvelabs.io) multimodal AI to analyze the recording, and produces:
 - An AI-generated EMR (Electronic Medical Record)
