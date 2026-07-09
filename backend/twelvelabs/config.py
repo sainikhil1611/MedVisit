@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TWELVELABS_API_KEY = os.getenv("TWELVELABS_API_KEY", "tlk_06YJPCA049YHJ82K8WWZ80QV9GE2")
+TWELVELABS_API_KEY = os.getenv("TWELVELABS_API_KEY", "")
 TWELVELABS_BASE_URL = "https://api.twelvelabs.io/v1.3"
 TWELVELABS_INDEX_ID = os.getenv("TWELVELABS_INDEX_ID", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")

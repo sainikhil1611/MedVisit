@@ -13,7 +13,9 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        // Overridable so the dev proxy can reach a container service name
+        // (e.g. "http://backend:8000" in docker-compose) instead of localhost.
+        target: process.env.BACKEND_URL || "http://localhost:8000",
         changeOrigin: true,
       },
     },
