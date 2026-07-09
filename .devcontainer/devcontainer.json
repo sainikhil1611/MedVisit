@@ -1,0 +1,13 @@
+{
+  "name": "MedVisit",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "frontend",
+  "workspaceFolder": "/workspaces/MedVisit",
+  "forwardPorts": [8080, 8000],
+  "postCreateCommand": "npm ci",
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint"]
+    }
+  }
+}

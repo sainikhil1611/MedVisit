@@ -1,0 +1,24 @@
+services:
+  backend:
+    image: mcr.microsoft.com/devcontainers/python:3.12-bookworm
+    working_dir: /workspaces/MedVisit
+    volumes:
+      - .:/workspaces/MedVisit:cached
+    command: sleep infinity
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=http://localhost:8080
+
+  frontend:
+    image: mcr.microsoft.com/devcontainers/typescript-node:22-bookworm
+    working_dir: /workspaces/MedVisit
+    volumes:
+      - .:/workspaces/MedVisit:cached
+    command: sleep infinity
+    ports:
+      - "8080:8080"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
