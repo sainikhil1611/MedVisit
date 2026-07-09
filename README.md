@@ -1,97 +1,82 @@
-# Project Overview
+# MedVisit
 
-MedVisit is a healthcare consultation tool built for a hackathon. It records doctor-patient consultations (video), uses [TwelveLabs](https://twelvelabs.io) multimodal AI to analyze the recording, and produces:
-- An AI-generated EMR (Electronic Medical Record)
-- AI-extracted medication suggestions for the doctor to review/approve/override
-- A patient-facing summary with timestamped video navigation
+MedVisit is a healthcare consultation tool: doctors upload a recorded doctor-patient
+consultation video, [TwelveLabs](https://twelvelabs.io) multimodal AI analyzes it to
+produce an AI-generated EMR (Electronic Medical Record) and medication suggestions,
+the doctor reviews/approves/overrides the medications, and the patient views a
+summary with timestamped video navigation and optional text-to-speech. Frontend is
+Vite 5 + React 18 + TypeScript + shadcn/ui + TanStack Query; backend is Python
+FastAPI with no database (all state is in-memory).
 
-The workflow is: **Doctor uploads video → AI analyzes → Doctor reviews & approves medications → Patient views summary + medication plan**
+## Quick start (devcontainer — recommended)
 
-## Architecture
+1. Prereqs: [Docker](https://docs.docker.com/get-docker/), [VS Code](https://code.visualstudio.com/) + the "Dev Containers" extension.
+2. Open this folder in VS Code → "Reopen in Container" when prompted. This attaches to the `frontend` service (runs `npm ci` automatically) and starts a `backend` service alongside it (installs Python deps automatically on container start — see `docker-compose.yml`).
+3. `cp backend/twelvelabs/.env.example backend/twelvelabs/.env` and fill in values (see table below).
+4. In the frontend terminal: `npm run dev` → open http://localhost:8080
+   In a second terminal attached to the `backend` service (`docker compose exec backend bash`): `cd backend/twelvelabs && uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
+   The frontend's Vite dev proxy reaches the backend by its compose service name (`http://backend:8000`, set via `BACKEND_URL`), so `http://localhost:8080/api/*` works end-to-end.
 
-### Two-service architecture
+## Manual setup (no devcontainer)
 
-**Frontend** — React + Vite (port 8080)
-**Backend** — FastAPI (port 8000)
-
-The Vite dev server proxies all `/api/*` requests to `http://localhost:8000`, so the frontend always calls relative `/api/...` paths.
-
-### Frontend (`src/`)
-
-- **`src/App.tsx`** — Router root. Three routes: `/doctor`, `/patient`, `/dashboard`. Root redirects to `/doctor`.
-- **`src/lib/api.ts`** — All API calls to the backend. Single source of truth for request/response types (`AIMedication`, `UploadResult`, `SummaryResult`, etc.). `VIDEO_ID_KEY` is the localStorage key used to persist `video_id` across views.
-- **`src/lib/mockData.ts`** — Fallback mock data displayed when the backend hasn't returned results yet (PatientView falls back to mocks until queries resolve).
-- **`src/pages/DoctorView.tsx`** — Two-step flow: `upload` → `review`. Persists `video_id` in localStorage.
-- **`src/pages/PatientView.tsx`** — Reads `video_id` from localStorage, fetches gist/summary/chapters/videoInfo via TanStack Query (`staleTime: Infinity` to avoid re-fetching). Falls back to mock data while loading.
-- **`src/components/VideoUpload.tsx`** — Handles file drag-drop/select, uploads to backend, polls `/api/upload/status/:taskId` every 3s until `status === "ready"`.
-- **`src/components/MedicationPlanDoctor.tsx`** — Fetches pending reviews, lets doctor toggle approval per medication, edit/add/remove medications, then calls approve or override endpoint.
-- **`src/components/EMRDocument.tsx`** — Renders the EMR for doctor approval.
-- **`src/components/ui/`** — shadcn/ui component library (do not hand-edit these files).
-
-### Backend (`backend/twelvelabs/`)
-
-FastAPI app with routers, all mounted under `/api`:
-
-| Router | Endpoints |
-|--------|-----------|
-| `upload.py` | `POST /api/upload`, `GET /api/upload/status/:task_id`, `GET /api/video/:video_id` |
-| `summary.py` | `GET /api/summary/:video_id` |
-| `gist.py` | `GET /api/gist/:video_id` |
-| `chapters.py` | `GET /api/chapters/:video_id` |
-| `review.py` | `GET /api/review/pending`, `POST /api/review/:video_id/approve`, `POST /api/review/:video_id/override` |
-
-**State management**: The backend uses an in-memory `task_registry` dict (no database). Medication results are cached in `_medication_store` in `medication_extractor.py`. State is lost on restart.
-
-**Post-upload pipeline**: After a video is uploaded and indexed by TwelveLabs, a FastAPI `BackgroundTask` runs `_post_index_pipeline` which calls `extract_medications()` using TwelveLabs' open-ended text generation API.
-
-**`config.py`**: Reads `TWELVELABS_API_KEY` and `TWELVELABS_INDEX_ID` from environment / `.env`. The index ID must be set before the backend can handle uploads.
-
-## Commands
-
-### Frontend
-
+**Frontend** (from repo root):
 ```bash
-npm run dev          # Start dev server on port 8080
-npm run build        # Production build
-npm run lint         # ESLint
-npm test             # Run tests once (vitest)
-npm run test:watch   # Run tests in watch mode
+npm ci
+npm run dev          # http://localhost:8080
 ```
 
-Run a single test file:
+**Backend** (from `backend/twelvelabs/`):
 ```bash
-npx vitest run src/test/example.test.ts
-```
-
-### Backend
-
-```bash
-# From backend/twelvelabs/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# One-time index setup (run once, writes TWELVELABS_INDEX_ID to backend/.env)
-python scripts/setup_index.py
-
-# Start the API server
+cp .env.example .env   # fill in real values
+python scripts/setup_index.py   # one-time: creates the TwelveLabs index, writes TWELVELABS_INDEX_ID to .env
 uvicorn main:app --reload --port 8000
 ```
+The backend must be started from `backend/twelvelabs/` so its relative imports (`from routers import ...`, `from config import ...`) resolve.
 
-The backend must be started from `backend/twelvelabs/` so that relative imports (`from routers import ...`, `from config import ...`) resolve correctly.
+## Environment variables
 
-## Environment Setup
+All backend env vars live in `backend/twelvelabs/.env` (copy from `backend/twelvelabs/.env.example`).
 
-Create `backend/twelvelabs/.env` (or `backend/.env`):
+| Variable | Required | Purpose | Where to get it |
+|---|---|---|---|
+| `TWELVELABS_API_KEY` | Yes | TwelveLabs video indexing/analysis for all upload/summary/chapters/gist/search/review endpoints. Backend refuses to start (clean exit, no traceback) if unset. | https://playground.twelvelabs.io/dashboard/api-key |
+| `TWELVELABS_INDEX_ID` | Effectively yes | TwelveLabs index ID. Health check works without it; upload/review/search/summary endpoints return a clean `500` if unset. | Run `python scripts/setup_index.py` once (writes it to `.env`) |
+| `ELEVENLABS_API_KEY` | No | Text-to-speech on `/api/tts` only. Endpoint returns a clean `500` if unset — no crash. | https://elevenlabs.io/app/settings/api-keys |
+| `CORS_ORIGINS` | No | Comma-separated list of allowed frontend origins. Defaults to `http://localhost:8080`. | — |
+
+Also required at runtime (not env vars): outbound network access to `api.twelvelabs.io`, `api.elevenlabs.io` (if TTS used), Google Translate (via `deep-translator`, used by TTS for non-English text), and `fonts.googleapis.com` (frontend, Google Fonts `@import`).
+
+## Testing
+
+Frontend: `npm test` (runs `vitest run`). Currently 1 trivial test — `src/test/example.test.ts` — expected result: `Test Files 1 passed (1)`, `Tests 1 passed (1)`.
+
+Backend: no automated test suite exists (no `test_*.py`/`*_test.py` files, pytest not in `requirements.txt`). Manual verification: `python -m compileall -q backend/twelvelabs` should print no errors, and `curl http://localhost:8000/api/health` should return `{"status":"ok"}`.
+
+## Deployment
+
+Two separate production images (frontend static build served by nginx, backend FastAPI/uvicorn) — build and run each independently:
+
+```bash
+# Frontend (from repo root)
+docker build -t medvisit-frontend .
+docker run -p 8080:80 medvisit-frontend
+
+# Backend (from backend/twelvelabs/)
+docker build -t medvisit-backend -f Dockerfile .
+docker run --env-file .env -p 8000:8000 medvisit-backend
 ```
-TWELVELABS_API_KEY=<your key>
-TWELVELABS_INDEX_ID=<run setup_index.py to generate>
-```
 
-The `TWELVELABS_API_KEY` has a hardcoded fallback in `config.py` for hackathon convenience, but `TWELVELABS_INDEX_ID` must be set via the setup script or manually.
+When deploying, set `CORS_ORIGINS` on the backend to the frontend's real origin, and point the frontend's API calls (`src/lib/api.ts`, `BASE_URL = "/api"`) at the backend through your reverse proxy / load balancer — there is no built-in production proxy (the Vite dev proxy only exists in `npm run dev`).
 
-## Key Patterns
+This container runs on any host (Fly.io, Render, a VPS with Docker) — see
+[DEPLOYMENT.md](../DEPLOYMENT.md) in the Projects root for the full walkthrough.
 
-- **TanStack Query** is used for all backend fetches. `staleTime: Infinity` is used on results that shouldn't be refetched (video analysis results are immutable once complete).
-- **Mock data fallback**: PatientView always shows mock data until real API data resolves — it does not show a loading skeleton for the entire page.
-- **`@` path alias** maps to `src/` (configured in `vite.config.ts` and `tsconfig`).
-- **Tailwind CSS** with shadcn/ui design tokens (`text-foreground`, `bg-muted`, `text-primary`, etc.). Custom semantic colors include `success`, `warning`, `accent`.
+## Known limitations
+
+- **State is 100% in-memory** (`task_registry`, and per-router caches for summaries/chapters/gists/medications/documents). A backend restart loses all uploaded-video progress and doctor review decisions — no database, no persistent volume. Acceptable for hackathon scope; would need a real datastore for production.
+- **No authentication/authorization.** All routes (`/doctor`, `/patient`, `/dashboard`) and all backend endpoints (including doctor-only `/api/review/*/approve`, `/api/review/*/override`) are open to any client. Fine for a demo, not safe to deploy publicly as-is.
+- **TwelveLabs/ElevenLabs-dependent behavior is unverified in this pass** — verification here confirmed the backend builds, starts, and serves `/api/health` with a placeholder key, and fails cleanly without one; it did not exercise real video upload/indexing/analysis/TTS, which require live API keys and real quota.
+- Google Fonts `@import` in `src/index.css` is placed after the `@tailwind` directives, which is invalid CSS import ordering (Vite warns at build time) and requires outbound network access to `fonts.googleapis.com` at page load.
+- `npm audit` reports 20 vulnerabilities (1 low, 6 moderate, 12 high, 1 critical) in frontend dependencies as of this pass — not remediated here (out of scope), recommend reviewing `npm audit fix`.
