@@ -4,7 +4,10 @@ services:
     working_dir: /workspaces/MedVisit
     volumes:
       - .:/workspaces/MedVisit:cached
-    command: sleep infinity
+    # devcontainer postCreateCommand only runs in the attached service
+    # (frontend), so install backend deps here on container start to keep
+    # parity with the frontend's automatic `npm ci`.
+    command: bash -c "pip install --user -r backend/twelvelabs/requirements.txt && sleep infinity"
     ports:
       - "8000:8000"
     environment:
